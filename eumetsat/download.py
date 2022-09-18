@@ -10,10 +10,8 @@ import pandas as pd
 import pyresample as pr
 import requests
 from absl import flags, app, logging
-from pyproj import CRS
 from pyproj.crs import CRS
 from satpy import Scene
-
 from zephyrus.data_pipelines.parsers.EUMETSAT import EuMetSat
 from zephyrus.utils.standard_logger import build_logger
 
@@ -35,25 +33,21 @@ reader = "seviri_l1b_native"
 """" Extract consts """
 # TODO we should save this metadata somewhere as we output to PNG so it can get lost
 # UK coords in degrees as per WSG84 [llx, lly, urx, ury]
-area_extent = (-12., 48., 5., 61.)
+area_extent = [-12., 48., 5., 61.]
 area_id = "UK"
 description = "Geographical Coordinate System clipped on UK"
 proj_dict = {"proj": "longlat", "ellps": "WGS84", "datum": "WGS84"}
-proj_crs = CRS.from_user_input(4326)  # Target Projection EPSG:4326 standard lat lon geograpic
-output_res = (500, 500)  # Target res in pixels
+proj_crs = CRS.from_user_input(4326).to_dict()  # Target Projection EPSG:4326 standard lat lon geograpic
+output_res = [500, 500]  # Target res in pixels
 area_def = pr.geometry.AreaDefinition.from_extent(area_id, proj_crs, output_res, area_extent)
 
 
 def get_dl_path():
-    return FLAGS.dl_base_path
+    return os.path.join(FLAGS.dl_base_path, "EUMETSAT/RAW")
 
 
 def get_data_path():
-    return FLAGS.ext_base_path
-
-
-DL_BASE_DIR = os.path.join(get_dl_path(), "EUMETSAT/RAW")
-EXTRACT_BASE_DIR = os.path.join(get_data_path(), "EUMETSAT/UK-EXT")
+    return os.path.join(FLAGS.ext_base_path, "EUMETSAT/UK-EXT")
 
 
 @dataclass
@@ -124,7 +118,7 @@ class Extract(Process):
             res = scn.resample(area_def, resampler="bilinear")  # cache_dir='/resample_cache/'
             res.save_datasets(writer="simple_image",
                               filename="{start_time:year=%Y/month=%m/day=%d/time=%H_%M}/format={name}/img.png",
-                              format="png", base_dir=EXTRACT_BASE_DIR)
+                              format="png", base_dir=get_data_path())
 
         except Exception as e:
             logging.error(e)
@@ -174,7 +168,7 @@ class Gen(Process):
         _months = zip(_months[:-1], _months[1:])
         months = {ts.strftime("year=%Y/month=%m"): (ts, te) for ts, te in _months}
         for mp, tr in months.items():
-            time_root = os.path.join(EXTRACT_BASE_DIR, mp)
+            time_root = os.path.join(get_data_path(), mp)
             if os.path.exists(time_root):
                 search.append(tr)
             else:
@@ -188,7 +182,7 @@ class Gen(Process):
         days = {ts.strftime("year=%Y/month=%m/day=%d"): (ts, te) for ts, te in _days}
         search = []
         for mp, tr in days.items():
-            time_root = os.path.join(EXTRACT_BASE_DIR, mp)
+            time_root = os.path.join(get_data_path(), mp)
             if os.path.exists(time_root):
                 search.append(tr)
             else:
@@ -203,7 +197,7 @@ class Gen(Process):
                      ok_hour(ts)}
 
         for dp, tr in time_feat.items():
-            time_root = os.path.join(EXTRACT_BASE_DIR, dp)
+            time_root = os.path.join(get_data_path(), dp)
             for l in EuMetSat.img_layers:
                 time_layer = os.path.join(time_root, f"format={l}/img.png")
                 if not os.path.exists(time_layer):
@@ -288,7 +282,7 @@ class Downloader(Process):
         path = os.path.join(base, filename)
         logging.info(f"{url} -> {path}")
 
-        dir = os.path.join(DL_BASE_DIR, base)
+        dir = os.path.join(get_dl_path(), base)
         os.makedirs(dir, exist_ok=True)
         path = os.path.join(dir, filename)
         with open(path, 'wb') as f:
