@@ -102,7 +102,8 @@ class Extract(Process):
         self.logger = build_logger("Extractor")
 
     def run(self):
-        while True:
+        running = True
+        while running:
             next_task = self.files.get()
             if next_task is None:
                 logging.info('Tasks Complete')
@@ -255,14 +256,15 @@ class Downloader(Process):
         self.t = t
 
     def run(self):
-        while True:
+        running = True
+        while running:
             file_path = None
             next_task = None
             try:
                 next_task = self.task_queue.get()
                 if next_task is None:
                     logging.info('Tasks Complete')
-                    self.task_queue.task_done()
+                    running = False
                     break
                 start_time = time.monotonic()
                 file_path = self._run(next_task)
