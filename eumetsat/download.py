@@ -15,13 +15,14 @@ from pyproj.crs import CRS
 from satpy import Scene
 from zephyrus.utils.standard_logger import build_logger
 
-flags.DEFINE_integer('dl', default=1, help="Number of download procs to run")
-flags.DEFINE_integer('ep', default=2, help="Number of extractor procs to run")
+flags.DEFINE_integer('dl', default=2, help="Number of download procs to run")
+flags.DEFINE_integer('ep', default=1, help="Number of extractor procs to run")
 flags.DEFINE_string('st', default="2020-01-01", help="Start Date")
 flags.DEFINE_string('et', default="2021-01-01", help="End Date")
-flags.DEFINE_string("dl_base_path", default="/dev/shm", help="Base download path")
-flags.DEFINE_string("ext_base_path", default="/db", help="Base download path")
-flags.DEFINE_multi_integer("mins", default=[0], help="Minutes to ")
+flags.DEFINE_string("dl_base_path", default="/dev/shm", help="Temp download path, RAM disk for high IOPS is good")
+flags.DEFINE_string("ext_base_path", default=".", help="Path to save extracted files")
+flags.DEFINE_multi_integer("mins", default=[0], help="Minutes of hour to download, any combination of 0, 15, 30, 45")
+flags.DEFINE_integer("chunk_size", default=1024, help="Download chunk size in Kb")
 
 FLAGS = flags.FLAGS
 
@@ -292,7 +293,7 @@ class Downloader(Process):
         path = os.path.join(dir, filename)
         logging.info(f"{url} -> {path}")
         with open(path, 'wb') as f:
-            for c in res.iter_content(chunk_size=1024 * 1024 * 4):
+            for c in res.iter_content(chunk_size=int(1024 * FLAGS.chunk_size)):
                 f.write(c)
         return path
 
@@ -308,7 +309,7 @@ def main(argv):
 
     # Queue for interprocess communication
     url_q = JoinableQueue(DL_PROCS + int(DL_PROCS * 0.20))
-    file_q = JoinableQueue(EX_PROCS + int(EX_PROCS * 0.20))
+    file_q = JoinableQueue(EX_PROCS + int(EX_PROCS * 0.20) + 2)
 
     # TODO: use a threadpool and aync maps for this, why are we managing it ourselvs?
     logging.info("Starting Processes")
