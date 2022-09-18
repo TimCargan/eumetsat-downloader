@@ -1,0 +1,12 @@
+setuptools
+rich
+pandas
+requests
+pandas
+pyarrow
+python-snappy
+pillow
+haversine
+pyproj
+satpy
+pyresample
