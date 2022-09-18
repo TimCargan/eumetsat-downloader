@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import reduce
@@ -12,14 +13,13 @@ import requests
 from absl import flags, app, logging
 from pyproj.crs import CRS
 from satpy import Scene
-from zephyrus.data_pipelines.parsers.EUMETSAT import EuMetSat
 from zephyrus.utils.standard_logger import build_logger
 
 flags.DEFINE_integer('dl', default=1, help="Number of download procs to run")
 flags.DEFINE_integer('ep', default=2, help="Number of extractor procs to run")
 flags.DEFINE_string('st', default="2020-01-01", help="Start Date")
 flags.DEFINE_string('et', default="2021-01-01", help="End Date")
-flags.DEFINE_string("dl_base_path", default="/db", help="Base download path")
+flags.DEFINE_string("dl_base_path", default="/dev/shm", help="Base download path")
 flags.DEFINE_string("ext_base_path", default="/db", help="Base download path")
 flags.DEFINE_multi_integer("mins", default=[0], help="Minutes to ")
 
@@ -27,9 +27,11 @@ FLAGS = flags.FLAGS
 
 
 # MSG15-RSS
-collection_id = 'EO:EUM:DAT:MSG:HRSEVIRI'
+COLLECTION_ID = 'EO:EUM:DAT:MSG:HRSEVIRI'
+IMG_LAYERS = ["HRV", "VIS006", "VIS008", "IR_016", "IR_039", "WV_062", "WV_073", "IR_087", "IR_097", "IR_108", "IR_120", "IR_134"]
 # read the file
-reader = "seviri_l1b_native"
+READER = "seviri_l1b_native"
+
 """" Extract consts """
 # TODO we should save this metadata somewhere as we output to PNG so it can get lost
 # UK coords in degrees as per WSG84 [llx, lly, urx, ury]
@@ -106,14 +108,17 @@ class Extract(Process):
                 self.files.task_done()
                 break
             path = next_task
+            start_time = time.monotonic()
             self.make_pngs(path)
+            duration = time.monotonic() - start_time
+            logging.info(f"Extract took {duration:3.0f}s")
             self.files.task_done()
 
     def make_pngs(self, path):
         ret = True
         try:
             self.logger.info(f"Loading {path}")
-            scn = Scene(filenames={reader: [path]})
+            scn = Scene(filenames={READER: [path]})
             scn.load(scn.all_dataset_names())  # Load all the data inc HRV
             res = scn.resample(area_def, resampler="bilinear")  # cache_dir='/resample_cache/'
             res.save_datasets(writer="simple_image",
@@ -198,7 +203,7 @@ class Gen(Process):
 
         for dp, tr in time_feat.items():
             time_root = os.path.join(get_data_path(), dp)
-            for l in EuMetSat.img_layers:
+            for l in IMG_LAYERS:
                 time_layer = os.path.join(time_root, f"format={l}/img.png")
                 if not os.path.exists(time_layer):
                     yield tr
@@ -258,7 +263,10 @@ class Downloader(Process):
                     logging.info('Tasks Complete')
                     self.task_queue.task_done()
                     break
+                start_time = time.monotonic()
                 file_path = self._run(next_task)
+                duration = time.monotonic() - start_time
+                logging.info(f"Download took {duration:3.0f}s")
             except Exception as e:
                 logging.error(f"Error on {next_task}")
                 logging.error(e)
@@ -272,19 +280,17 @@ class Downloader(Process):
         sip_ents = next_task['properties']['links']['sip-entries']
         nat_file = filter(lambda x: x['mediaType'] == 'application/octet-stream', sip_ents)
         dl_url = list(nat_file)[0]['href']
-        folder = os.path.join(collection_id.replace(":", "_"), date.strftime("year=%Y/month=%m/day=%d/time=%H_%M"))
+        folder = os.path.join(COLLECTION_ID.replace(":", "_"), date.strftime("year=%Y/month=%m/day=%d/time=%H_%M"))
         file_path = self.download(dl_url, folder)
         return file_path
 
     def download(self, url, base) -> str:
         res = requests.get(url, {"access_token": self.t.token}, stream=True)
         filename = re.findall("\"(.*?)\"", res.headers['Content-Disposition'])[0]
-        path = os.path.join(base, filename)
-        logging.info(f"{url} -> {path}")
-
         dir = os.path.join(get_dl_path(), base)
         os.makedirs(dir, exist_ok=True)
         path = os.path.join(dir, filename)
+        logging.info(f"{url} -> {path}")
         with open(path, 'wb') as f:
             for c in res.iter_content(chunk_size=1024 * 1024 * 4):
                 f.write(c)
@@ -313,7 +319,7 @@ def main(argv):
 
     logging.info(f"Starting Gen for {start_date} to {end_date}")
     # Start and join generator
-    g = Gen(url_q, collection_id, start_date, end_date)
+    g = Gen(url_q, COLLECTION_ID, start_date, end_date)
     g.start()
     g.join()  # wait for generator to add all urls
 
