@@ -243,7 +243,9 @@ class Gen(Process):
                 break
             found_data_sets = response.json()
             feats.extend(found_data_sets["features"])
-            total = found_data_sets['properties']['totalResults']
+            total = found_data_sets.get('totalResults', None)
+            if total is None:
+                logging.error("Total Results Key missing")
             parameters["si"] += self.items_per_page
         return feats
 
