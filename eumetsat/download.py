@@ -1,7 +1,10 @@
 import json
 import os
+import random
 import re
+import shutil
 import time
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import reduce
@@ -15,7 +18,7 @@ from pyproj.crs import CRS
 from satpy import Scene
 from zephyrus.utils.standard_logger import build_logger
 
-flags.DEFINE_integer('dl', default=2, help="Number of download procs to run")
+flags.DEFINE_integer('dl', default=1, help="Number of download procs to run")
 flags.DEFINE_integer('ep', default=1, help="Number of extractor procs to run")
 flags.DEFINE_string('st', default="2020-01-01", help="Start Date")
 flags.DEFINE_string('et', default="2021-01-01", help="End Date")
@@ -89,17 +92,11 @@ def ok_hour(date):
     return date.minute in [30]  # TODO: add this as a flag, with defult [0]
 
 
-def ft(x):
-    ds = x["properties"]["date"].split("/")[0]
-    date = parse_date(ds)
-    return ok_hour(date)
-
 
 class Extract(Process):
     def __init__(self, files: JoinableQueue):
         Process.__init__(self)
         self.files = files
-        self.logger = build_logger("Extractor")
 
     def run(self):
         running = True
@@ -116,9 +113,15 @@ class Extract(Process):
             logging.info(f"Extract took {duration:3.0f}s")
             self.files.task_done()
 
-    def make_pngs(self, path):
+    def make_pngs(self, zip_path):
+        self.logger = build_logger("Extractor")
         ret = True
+        zip_file = os.path.basename(zip_path)
+        zip_folder = os.path.dirname(zip_path)
+        file_name = zip_file.replace(".zip", ".nat")
         try:
+            logging.info(f"Unzipping {zip_path}")
+            path = zipfile.ZipFile(zip_path).extract(file_name, path=zip_folder)
             self.logger.info(f"Loading {path}")
             scn = Scene(filenames={READER: [path]})
             scn.load(scn.all_dataset_names())  # Load all the data inc HRV
@@ -131,9 +134,9 @@ class Extract(Process):
             logging.error(e)
             ret = False
         finally:
-            # Delete Nat file, keep disk space free as they are big
-            logging.info(f"Removing {path}")
-            os.remove(path)
+            # Delete Zip and Nat file, keep disk space free as they are big
+            logging.info(f"Removing {zip_folder}")
+            shutil.rmtree(zip_folder)
             return ret
 
 
@@ -211,17 +214,27 @@ class Gen(Process):
                     yield tr
                     break
 
+    @staticmethod
+    def ft(x):
+        ds = x["properties"]["date"].split("/")[0]
+        date = parse_date(ds)
+        sat_ok = x["id"][:4] in ["MSG3", "MSG4"]
+        return ok_hour(date) and sat_ok
+
     def loop(self):
         for range in self.gaps():
             logging.info(f"{range}")
             batch_uf = self.get_unfiltered_range(*range)
-            batch = filter(ft, batch_uf)
+            batch = filter(self.ft, batch_uf)
             # put files on queue
             for el in batch:
                 ds = el["properties"]["date"].split("/")[0]
                 date = parse_date(ds)
                 logging.info(
                     f"Adding File {date.strftime('year=%Y/month=%m/day=%d/time=%H_%M')} to DL Queue")
+                # Stagger when we add a new download so there is a bit of an offset
+                if FLAGS.dl > 1:
+                    time.sleep(random.randint(3, 15))
                 self.task_queue.put(el)
 
     def get_unfiltered_range(self, start_ts: datetime, end_ts: datetime):
@@ -244,6 +257,7 @@ class Gen(Process):
             found_data_sets = response.json()
             feats.extend(found_data_sets["features"])
             total = found_data_sets.get('totalResults', None)
+            total = total if total is not None else found_data_sets["properties"].get('totalResults', None)
             if total is None:
                 logging.error("Total Results Key missing")
             parameters["si"] += self.items_per_page
@@ -285,19 +299,21 @@ class Downloader(Process):
         sip_ents = next_task['properties']['links']['sip-entries']
         nat_file = filter(lambda x: x['mediaType'] == 'application/octet-stream', sip_ents)
         dl_url = list(nat_file)[0]['href']
+        data_url = next_task['properties']['links']['data'][0]["href"]
         folder = os.path.join(COLLECTION_ID.replace(":", "_"), date.strftime("year=%Y/month=%m/day=%d/time=%H_%M"))
-        file_path = self.download(dl_url, folder)
+        file_path = self.download(data_url, folder)
         return file_path
 
     def download(self, url, base) -> str:
         res = requests.get(url, {"access_token": self.t.token}, stream=True)
+        res.raise_for_status()
         filename = re.findall("\"(.*?)\"", res.headers['Content-Disposition'])[0]
         dir = os.path.join(get_dl_path(), base)
         os.makedirs(dir, exist_ok=True)
         path = os.path.join(dir, filename)
         logging.info(f"{url} -> {path}")
         with open(path, 'wb') as f:
-            for c in res.iter_content(chunk_size=int(1024 * FLAGS.chunk_size)):
+            for c in res.iter_content(chunk_size=None):
                 f.write(c)
         return path
 
@@ -325,17 +341,18 @@ def main(argv):
     logging.info(f"Starting Gen for {start_date} to {end_date}")
     # Start and join generator
     g = Gen(url_q, COLLECTION_ID, start_date, end_date)
-    g.start()
-    g.join()  # wait for generator to add all urls
+    g.run()
 
     # Join queue and put `final` message to end downloader
     logging.info(f"Added Termination Singles to DOWNLOAD queue")
     [url_q.put(None) for _ in range(DL_PROCS)]
+    logging.info("Joining URL q")
     url_q.join()  # wait for files to download
     logging.info("URL Queue Done")
 
     logging.info(f"Added Termination Singles to Extract queue")
     [file_q.put(None) for _ in range(EX_PROCS)]
+    logging.info("Joining Extract q")
     [e.join() for e in ex]
     logging.info("All Procs Done")
 
