@@ -89,7 +89,7 @@ def parse_date(ds: str) -> datetime:
 
 
 def ok_hour(date):
-    return date.minute in [30]  # TODO: add this as a flag, with defult [0]
+    return date.minute in FLAGS.mins
 
 
 
