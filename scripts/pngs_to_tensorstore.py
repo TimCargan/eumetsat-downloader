@@ -57,7 +57,7 @@ async def main(argv):
     z = int(date_rage[0].timestamp())
 
     out_path = os.path.join(get_path("data"),
-                        f"EUMETSAT/UK-EXT/img_z={ts_start.timestamp()},e={ts_end.timestamp()},f={freq}.ts")
+                        f"EUMETSAT/UK-EXT/img_z={int(ts_start.timestamp())},e={int(ts_end.timestamp())},f={freq}.ts.zarr")
 
     dataset = tensorstore.open({
         'driver': 'n5',
