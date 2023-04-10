@@ -11,12 +11,12 @@ from functools import reduce
 from multiprocessing import Process, JoinableQueue
 
 import pandas as pd
-import pyresample as pr
 import requests
 from absl import flags, app, logging
-from pyproj.crs import CRS
+from hemera.standard_logger import build_logger
 from satpy import Scene
-from zephyrus.utils.standard_logger import build_logger
+
+import eumetsat.utils
 
 flags.DEFINE_integer('dl', default=1, help="Number of download procs to run")
 flags.DEFINE_integer('ep', default=1, help="Number of extractor procs to run")
@@ -31,23 +31,23 @@ FLAGS = flags.FLAGS
 
 
 # MSG15-RSS
-COLLECTION_ID = 'EO:EUM:DAT:MSG:HRSEVIRI'
-IMG_LAYERS = ["HRV", "VIS006", "VIS008", "IR_016", "IR_039", "WV_062", "WV_073", "IR_087", "IR_097", "IR_108", "IR_120", "IR_134"]
+COLLECTION_ID = eumetsat.COLLECTION_ID #'EO:EUM:DAT:MSG:HRSEVIRI'
+IMG_LAYERS = eumetsat.IMG_LAYERS # ["HRV", "VIS006", "VIS008", "IR_016", "IR_039", "WV_062", "WV_073", "IR_087", "IR_097", "IR_108", "IR_120", "IR_134"]
 # read the file
 READER = "seviri_l1b_native"
 
 """" Extract consts """
 # TODO we should save this metadata somewhere as we output to PNG so it can get lost
 # UK coords in degrees as per WSG84 [llx, lly, urx, ury]
-area_extent = [-12., 48., 5., 61.]
-area_id = "UK"
-description = "Geographical Coordinate System clipped on UK"
-proj_dict = {"proj": "longlat", "ellps": "WGS84", "datum": "WGS84"}
-proj_crs = CRS.from_user_input(4326).to_dict()  # Target Projection EPSG:4326 standard lat lon geograpic
-output_res = [500, 500]  # Target res in pixels
-area_def = pr.geometry.AreaDefinition.from_extent(area_id, proj_crs, output_res, area_extent)
+# area_extent = [-12., 48., 5., 61.]
+# area_id = "UK"
+# description = "Geographical Coordinate System clipped on UK"
+# proj_dict = {"proj": "longlat", "ellps": "WGS84", "datum": "WGS84"}
+# proj_crs = CRS.from_user_input(4326).to_dict()  # Target Projection EPSG:4326 standard lat lon geograpic
+# output_res = [500, 500]  # Target res in pixels
+# area_def = pr.geometry.AreaDefinition.from_extent(area_id, proj_crs, output_res, area_extent)
 
-
+area_def = eumetsat.utils.get_area_def()
 def get_dl_path():
     return os.path.join(FLAGS.dl_base_path, "EUMETSAT/RAW")
 
