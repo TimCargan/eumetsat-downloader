@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import abc
+from typing import TYPE_CHECKING
 
 from jaxtyping import Int, UInt8, Array
 
-from eumetsat.datasets import FileNameProps
+if TYPE_CHECKING:
+    from eumetsat.datasets import FileNameProps
 
 
 class BaseDataset(abc.ABC):

@@ -6,7 +6,7 @@ from jaxtyping import Int, UInt8, Array
 from eumetsat.datasets import FileNameProps, BaseDataset
 
 
-class NumpyImageBlob(BaseDataset):
+class EMNumpyDataset(BaseDataset):
     @property
     def props(self) -> FileNameProps:
         return self._props

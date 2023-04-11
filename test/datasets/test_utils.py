@@ -1,7 +1,7 @@
 from absl import flags
 from absl.testing import parameterized
 
-from eumetsat.datasets.utils import FileNameProps
+from eumetsat.datasets import FileNameProps
 
 FLAGS = flags.FLAGS
 
