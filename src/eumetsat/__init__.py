@@ -16,7 +16,7 @@ IMG_LAYERS = ["HRV", "VIS006", "VIS008", "IR_016",
 READER = "seviri_l1b_native"
 # Target Projection EPSG:4326 standard lat lon geographic
 TARGET_PROJ = 4326
-# UK coords in degrees as per WSG84 [llx, lly, urx, ury]
+# UK coords in degrees as per WSG84 [llx, lly, urx, ury] in the form of [Lon Lat Lon Lat]
 AREA_EXTENT = [-12., 48., 5., 61.]
 # Image size in pixels
 IMG_SIZE = [500, 500]

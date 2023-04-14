@@ -4,6 +4,25 @@ from pyresample.geometry import AreaDefinition
 from eumetsat import AREA_EXTENT, IMG_SIZE, TARGET_PROJ
 
 
+class _DataSpecs:
+    @property
+    def min_lat(self) -> float:
+        return AREA_EXTENT[1]
+
+    @property
+    def max_lat(self) -> float:
+        return AREA_EXTENT[3]
+
+    @property
+    def min_lon(self) -> float:
+        return AREA_EXTENT[0]
+
+    @property
+    def max_lon(self) -> float:
+        return AREA_EXTENT[2]
+
+dataspec = _DataSpecs()
+
 def get_area_def() -> AreaDefinition:
     area_extent = AREA_EXTENT
     area_id = "UK"

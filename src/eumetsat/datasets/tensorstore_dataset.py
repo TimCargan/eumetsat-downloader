@@ -4,7 +4,8 @@ import os
 import tensorstore as ts
 from jaxtyping import Int, UInt8, Array
 
-from eumetsat.datasets import FileNameProps, BaseDataset
+from eumetsat.datasets.abc_dataset import BaseDataset
+from eumetsat.datasets.utils import FileNameProps
 
 
 class EMTensorstoreDataset(BaseDataset):

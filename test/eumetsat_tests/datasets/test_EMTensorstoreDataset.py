@@ -1,8 +1,8 @@
 from absl import flags
 from absl.testing import parameterized
-from hemera import path_translator
 
 from eumetsat.datasets.tensorstore_dataset import EMTensorstoreDataset
+from hemera import path_translator
 
 FLAGS = flags.FLAGS
 

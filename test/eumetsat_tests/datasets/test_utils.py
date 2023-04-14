@@ -1,7 +1,7 @@
 from absl import flags
 from absl.testing import parameterized
 
-from eumetsat.datasets import FileNameProps
+from eumetsat.datasets.utils import FileNameProps
 
 FLAGS = flags.FLAGS
 
@@ -20,5 +20,3 @@ class test_path_translater(parameterized.TestCase):
         self.assertEqual(ext.time_zero, true["z"])
         self.assertEqual(ext.time_end, true["e"])
         self.assertEqual(ext.freq, true["f"])
-
-

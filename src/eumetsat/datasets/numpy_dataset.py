@@ -3,7 +3,8 @@ import os
 import numpy as np
 from jaxtyping import Int, UInt8, Array
 
-from eumetsat.datasets import FileNameProps, BaseDataset
+from eumetsat.datasets.abc_dataset import BaseDataset
+from eumetsat.datasets.utils import FileNameProps
 
 
 class EMNumpyDataset(BaseDataset):
