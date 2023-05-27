@@ -1,7 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
+
+@dataclass
+class Metadata:
+    metadata_created: datetime
+
+    first_example_date: datetime
+    last_example_date: datetime
+
+    example_count: int
+    missing: list[datetime]
+
+    freq_seconds: int
 
 @dataclass
 class FileNameProps:
