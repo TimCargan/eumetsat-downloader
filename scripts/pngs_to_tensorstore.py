@@ -118,7 +118,7 @@ async def main(argv):
                 "shuffle": 2
             },
             'dataType': 'uint8',
-            'blockSize': [24, 32, 32, 12],
+            'blockSize': [24, 128, 128, 12],
         },
         'create': True,
         'delete_existing': True
