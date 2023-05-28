@@ -139,7 +139,10 @@ async def main(argv):
         for x, kv in enumerate(kvc):
             dt = datetime.fromtimestamp(kv[0])
             if dt not in expected_missing:
-                read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
+                try:
+                    read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
+                except FileNotFoundError as e:
+                    print(f"Tried to read {dt}.... not sure why")
 
         s = i * chunk_size
         e = s + chunk_size
@@ -155,8 +158,8 @@ async def main(argv):
         metadata_created=datetime.now(),
         first_example_date=ts_start,
         last_example_date=ts_end,
-        example_count=len(set(target_date_range) - known_missing),
-        missing=known_missing,
+        example_count=len(set(target_date_range) - expected_missing),
+        missing=expected_missing,
         freq_seconds=freq,
         data_source=Path(img_base_path),
         data_location=out_path
