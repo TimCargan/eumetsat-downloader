@@ -1,20 +1,17 @@
-import concurrent
-import dataclasses
-import json
-import os
-import time
-from datetime import datetime, timedelta
+import serde
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import serde
+import serde.json
 from absl import flags, app
 from absl import logging
+from rich.progress import Progress
 
+from eumetsat import IMG_LAYERS
 from eumetsat.datasets.utils import Metadata
 from hemera import path_translator
-from rich.progress import Progress
-from eumetsat import IMG_LAYERS
-
 
 flags.DEFINE_integer("freq", default=900, help="Expected freq (in seconds) to scan for images")
 
@@ -70,11 +67,13 @@ def main(args):
         first_example_date=search_start,
         last_example_date=search_end,
         example_count=len(search_range) - len(missing),
-        missing=missing,
-        freq_seconds=freq
+        missing=set(missing),
+        freq_seconds=freq,
+        data_source=Path("external:EUMETSAT"),
+        data_location=img_base_path
     )
 
-    metadata_str = json.dumps(dataclasses.asdict(metadata), default=str)
+    metadata_str = serde.json.to_json(metadata)
     with out_file.open("w") as f:
         f.write(metadata_str)
 
