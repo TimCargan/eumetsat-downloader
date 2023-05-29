@@ -133,12 +133,12 @@ async def main(argv):
 
     p = Progress()
     p.start()
-    read_bar = p.add_task("[orange]Reading", total=len(date_dict) / chunk_size)
-    write_bar = p.add_task("[green]Writing", total=len(date_dict) / chunk_size)
+    read_bar = p.add_task("[dark_orange]Reading", total=len(date_dict))
+    write_bar = p.add_task("[green]Writing", total=len(date_dict) // chunk_size)
 
     for i, kvc in enumerate(d):
-        data = np.zeros((chunk_size, 500, 500, 12), dtype=np.uint8)
-
+        r_chunk_size = len(kvc)
+        data = np.zeros((r_chunk_size, 500, 500, 12), dtype=np.uint8)
         for x, kv in enumerate(kvc):
             dt = datetime.utcfromtimestamp(kv[0])
             if dt not in expected_missing:
@@ -146,10 +146,11 @@ async def main(argv):
                     read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
                 except FileNotFoundError as e:
                     print(f"Tried to read {dt}.... not sure why ({e})")
+                finally:
+                    p.update(read_bar, advance=1)
 
-        p.update(read_bar, advance=1)
         s = i * chunk_size
-        e = s + chunk_size
+        e = s + r_chunk_size
         write_future = dataset[s:e].write(data)
         write_future.add_done_callback(lambda _: p.update(write_bar, advance=1))
         writes.append(write_future)
