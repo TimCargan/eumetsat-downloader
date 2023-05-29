@@ -162,9 +162,9 @@ async def main(argv):
         write_q.put(write_future)
         writes.append(write_future)
 
-    logging.info("Queue join")
+    print("Queue join")
     write_q.join()
-    logging.info("Async wait")
+    print("Async wait")
     await asyncio.gather(*writes)
     p.stop()
 
