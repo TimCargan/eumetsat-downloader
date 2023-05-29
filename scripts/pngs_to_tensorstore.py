@@ -89,8 +89,10 @@ async def main(argv):
 
     date_dict = {int(ts.timestamp()): ts.strftime("year=%Y/month=%m/day=%d/time=%H_%M") for ts in target_date_range}
     samples = len(date_dict)
-    print(samples)
     z = int(target_date_range[0].timestamp())
+
+    logging.info("will scan for %d samples", samples)
+    logging.info("Known missing %s", expected_missing)
 
     fn = FileNameProps(time_zero=ts_start, time_end=ts_end, freq=freq)
     out_path = get_path("data") / f"EUMETSAT/UK-EXT/{fn}.ts.zarr"
@@ -139,10 +141,11 @@ async def main(argv):
         for x, kv in enumerate(kvc):
             dt = datetime.fromtimestamp(kv[0])
             if dt not in expected_missing:
-                try:
-                    read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
-                except FileNotFoundError as e:
-                    print(f"Tried to read {dt}.... not sure why")
+                print(dt)
+                # try:
+                #     read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
+                # except FileNotFoundError as e:
+                #     print(f"Tried to read {dt}.... not sure why")
 
         s = i * chunk_size
         e = s + chunk_size
@@ -150,9 +153,9 @@ async def main(argv):
         write_future.add_done_callback(lambda _: p.update(pbar, advance=1))
         writes.append(write_future)
 
-
     await asyncio.gather(*writes)
     p.stop()
+
     logging.info("Writing meta")
     metadata = Metadata(
         metadata_created=datetime.now(),
