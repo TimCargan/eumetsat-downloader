@@ -140,7 +140,7 @@ async def main(argv):
         data = np.zeros((chunk_size, 500, 500, 12), dtype=np.uint8)
 
         for x, kv in enumerate(kvc):
-            dt = datetime.fromtimestamp(kv[0])
+            dt = datetime.utcfromtimestamp(kv[0])
             if dt not in expected_missing:
                 try:
                     read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
