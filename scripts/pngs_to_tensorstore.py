@@ -1,4 +1,5 @@
 import asyncio
+import queue
 from datetime import datetime
 from pathlib import Path
 
@@ -127,6 +128,7 @@ async def main(argv):
     }).result()
 
     writes = []
+    write_q = queue.Queue(maxsize=500)
     chunk_size = 24
     d = list(date_dict.items())
     d = chunker(d, chunk_size)
@@ -135,6 +137,11 @@ async def main(argv):
     p.start()
     read_bar = p.add_task("[dark_orange]Reading", total=len(date_dict))
     write_bar = p.add_task("[green]Writing", total=len(date_dict) // chunk_size)
+
+    def cb(f):
+        write_q.get()
+        write_q.task_done()
+        p.update(write_bar, advance=1)
 
     for i, kvc in enumerate(d):
         r_chunk_size = len(kvc)
@@ -146,16 +153,18 @@ async def main(argv):
                     read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
                 except FileNotFoundError as e:
                     print(f"Tried to read {dt}.... not sure why ({e})")
-                finally:
-                    p.update(read_bar, advance=1)
+            p.update(read_bar, advance=1)
 
         s = i * chunk_size
         e = s + r_chunk_size
         write_future = dataset[s:e].write(data)
-        write_future.add_done_callback(lambda _: p.update(write_bar, advance=1))
+        write_future.add_done_callback(cb)
+        write_q.put(write_future)
         writes.append(write_future)
 
-
+    logging.info("Queue join")
+    write_q.join()
+    logging.info("Async wait")
     await asyncio.gather(*writes)
     p.stop()
 
