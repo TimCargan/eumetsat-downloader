@@ -9,7 +9,7 @@ import pandas as pd
 import serde.json
 import tensorstore
 from absl import flags, app, logging
-from rich.progress import Progress
+from rich.progress import Progress, MofNCompleteColumn
 
 from eumetsat import IMG_LAYERS
 from eumetsat.datasets.utils import Metadata, FileNameProps
@@ -127,16 +127,17 @@ async def main(argv):
         'delete_existing': True
     }).result()
 
-    writes = []
-    write_q = queue.Queue(maxsize=500)
+
+
     chunk_size = 24
     d = list(date_dict.items())
     d = chunker(d, chunk_size)
 
-    p = Progress()
+    p = Progress(*Progress.get_default_columns(), MofNCompleteColumn())
     p.start()
     read_bar = p.add_task("[dark_orange]Reading", total=len(date_dict))
     write_bar = p.add_task("[green]Writing", total=len(date_dict) // chunk_size)
+    write_q = queue.Queue(maxsize=50)
 
     def cb(f):
         write_q.get()
@@ -160,12 +161,10 @@ async def main(argv):
         write_future = dataset[s:e].write(data)
         write_future.add_done_callback(cb)
         write_q.put(write_future)
-        writes.append(write_future)
 
-    print("Queue join")
+
+    print("Queue join -- waiting for writes to finish")
     write_q.join()
-    print("Async wait")
-    await asyncio.gather(*writes)
     p.stop()
 
     logging.info("Writing meta")
