@@ -92,7 +92,7 @@ async def main(argv):
     z = int(target_date_range[0].timestamp())
 
     logging.info("will scan for %d samples", samples)
-    logging.info("Known missing %s", expected_missing)
+    logging.info("Known missing %s", sorted(expected_missing))
 
     fn = FileNameProps(time_zero=ts_start, time_end=ts_end, freq=freq)
     out_path = get_path("data") / f"EUMETSAT/UK-EXT/{fn}.ts.zarr"
@@ -133,7 +133,8 @@ async def main(argv):
 
     p = Progress()
     p.start()
-    pbar = p.add_task("[green]Loading", total=len(date_dict)/chunk_size)
+    read_bar = p.add_task("[orange]Reading", total=len(date_dict) / chunk_size)
+    write_bar = p.add_task("[green]Writing", total=len(date_dict) / chunk_size)
 
     for i, kvc in enumerate(d):
         data = np.zeros((chunk_size, 500, 500, 12), dtype=np.uint8)
@@ -146,11 +147,13 @@ async def main(argv):
                 except FileNotFoundError as e:
                     print(f"Tried to read {dt}.... not sure why ({e})")
 
+        p.update(read_bar, advance=1)
         s = i * chunk_size
         e = s + chunk_size
         write_future = dataset[s:e].write(data)
-        write_future.add_done_callback(lambda _: p.update(pbar, advance=1))
+        write_future.add_done_callback(lambda _: p.update(write_bar, advance=1))
         writes.append(write_future)
+
 
     await asyncio.gather(*writes)
     p.stop()
