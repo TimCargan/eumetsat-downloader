@@ -136,13 +136,13 @@ async def main(argv):
     p = Progress(*Progress.get_default_columns(), MofNCompleteColumn())
     p.start()
     read_bar = p.add_task("[dark_orange]Reading", total=len(date_dict))
-    write_bar = p.add_task("[green]Writing", total=len(date_dict) // chunk_size)
+    write_bar = p.add_task("[green]Writing", total=len(date_dict))
     write_q = queue.Queue(maxsize=50)
 
-    def cb(f):
+    def cb(r_chunk_size):
         write_q.get()
         write_q.task_done()
-        p.update(write_bar, advance=1)
+        p.update(write_bar, advance=r_chunk_size)
 
     for i, kvc in enumerate(d):
         r_chunk_size = len(kvc)
@@ -159,8 +159,9 @@ async def main(argv):
         s = i * chunk_size
         e = s + r_chunk_size
         write_future = dataset[s:e].write(data)
-        write_future.add_done_callback(cb)
         write_q.put(write_future)
+        write_future.add_done_callback(lambda r: cb(r_chunk_size))
+
 
 
     print("Queue join -- waiting for writes to finish")
