@@ -144,7 +144,7 @@ async def main(argv):
                 try:
                     read(kv, z=z, freq=freq, img_array=data, offset=i * chunk_size, img_base_path=img_base_path)
                 except FileNotFoundError as e:
-                    print(f"Tried to read {dt}.... not sure why")
+                    print(f"Tried to read {dt}.... not sure why ({e})")
 
         s = i * chunk_size
         e = s + chunk_size
