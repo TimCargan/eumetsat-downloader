@@ -29,7 +29,7 @@ flags.DEFINE_string("min_date", default="2018-01-01 00:00", help="Min date for i
 flags.DEFINE_string("max_date", default="2018-01-04 23:59", help="Max date for image files")
 flags.DEFINE_string("png_meta", default="png_metadata.json", help="Name of the png metadata")
 flags.DEFINE_integer("freq", default=3600, help="Freq (in seconds) of the images")
-
+flags.DEFINE_boolean("overwrite", default=False, help="Overwrite existing file")
 FLAGS = flags.FLAGS
 END_MSG = None
 TS_BYTES = 12 * 500 * 500
@@ -145,7 +145,8 @@ def validate_end(target_end: datetime, source_end: datetime, freq_min: int = 15)
 
 
 def get_spec(path: Path, samples: int, freq: int) -> dict:
-    create = not path.exists()
+    create = not path.exists() or FLAGS.overwrite
+    overwrite = FLAGS.overwrite if path.exists() else False
     return {
         'driver': 'n5',
         'context': {
@@ -177,8 +178,9 @@ def get_spec(path: Path, samples: int, freq: int) -> dict:
             'dataType': 'uint8',
             'blockSize': [24, 250, 250, 12],
         },
-        "open": True,
-        "create": create
+        "open": not overwrite,
+        "create": create,
+        "delete_existing": overwrite
     }
 
 
