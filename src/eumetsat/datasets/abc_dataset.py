@@ -3,10 +3,10 @@ from __future__ import annotations
 import abc
 from typing import TYPE_CHECKING
 
-from jaxtyping import Int, UInt8, Array
+from jaxtyping import Array, Int, UInt8
 
 if TYPE_CHECKING:
-    from eumetsat.datasets import FileNameProps
+    from eumetsat.datasets.utils import FileNameProps
 
 
 class BaseDataset(abc.ABC):
@@ -19,8 +19,9 @@ class BaseDataset(abc.ABC):
     @props.setter
     def props(self, value):
         pass
+
     def ts_to_idx(self, ts: int) -> int:
-        return ts - self.props.time_zero
+        return ts - int(self.props.time_zero.timestamp())
 
     @abc.abstractmethod
     def batch_from_timesamps_idx(self, ts_index: Int[Array, "batch"]) -> UInt8[Array, "batch 500 500 12"]:
